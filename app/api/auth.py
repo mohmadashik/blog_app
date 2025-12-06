@@ -60,3 +60,20 @@ def login(
 @router.get("/me", response_model=UserOut)
 def read_current_user(current_user: User = Depends(get_current_user)):  # Placeholder for actual dependency
     return current_user
+
+
+@router.post("/make-admin/{username}", response_model=UserOut)
+def make_admin(username: str, db: Session = Depends(get_db)):
+    """
+    TEMPORARY DEV ENDPOINT
+    Makes an existing user an admin.
+    REMOVE BEFORE DEPLOYING!
+    """
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    user.role = Role.admin
+    db.commit()
+    db.refresh(user)
+    return user

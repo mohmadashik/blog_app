@@ -4,6 +4,7 @@ from datetime import datetime
 import enum
 
 from app.db import Base
+from app.db.session import SessionLocal
 
 
 class BlogStatus(str, enum.Enum):
@@ -23,7 +24,11 @@ class Blog(Base):
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
-
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
     # Relationship backref
     author = relationship("User")

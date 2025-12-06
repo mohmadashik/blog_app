@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_current_user, require_role
 from app.model.blog import BlogStatus
-from app.model.user import Role
+from app.model.user import Role, User
 from app.schemas.blog import BlogCreate, BlogUpdate, BlogOut
 from app.crud import blog_crud as blog_crud
 
@@ -12,7 +12,23 @@ router = APIRouter()
 
 
 # -------------------------
-# Public: list approved
+# Admin / Approver: list pending blogs
+# -------------------------
+@router.get("/pending", response_model=list[BlogOut])
+def list_pending_blogs(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_role(Role.admin, Role.approver)),
+):
+    """
+    List all blogs with status 'pending'.
+    Only admin or approver can see this.
+    """
+    return blog_crud.list_pending(db)
+
+
+
+# -------------------------
+# Public: list all approved blogs
 # -------------------------
 @router.get("/", response_model=list[BlogOut])
 def list_public_blogs(db: Session = Depends(get_db)):
@@ -20,99 +36,232 @@ def list_public_blogs(db: Session = Depends(get_db)):
     return blogs
 
 
+
 # -------------------------
-# Create blog (user)
+# Authenticated: create blog (status = pending)
 # -------------------------
-@router.post("/", response_model=BlogOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/",
+    response_model=BlogOut,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_blog(
     blog_in: BlogCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     return blog_crud.create_blog(db, current_user.id, blog_in)
 
 
+
 # -------------------------
-# Get blog by ID
+# Public: get a single blog
+# Only approved are visible publicly
 # -------------------------
 @router.get("/{blog_id}", response_model=BlogOut)
 def get_blog(blog_id: int, db: Session = Depends(get_db)):
     blog = blog_crud.get_blog(db, blog_id)
-    if not blog:
-        raise HTTPException(404, "Blog not found")
+    if not blog or blog.status != BlogStatus.approved:
+        # Spec says: only approved articles are public
+        raise HTTPException(status_code=404, detail="Blog not found")
     return blog
 
 
 # -------------------------
-# Update blog (author only, only if still pending)
+# Author: update blog if still pending
 # -------------------------
 @router.put("/{blog_id}", response_model=BlogOut)
 def update_blog(
     blog_id: int,
     blog_update: BlogUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     blog = blog_crud.get_blog(db, blog_id)
     if not blog:
-        raise HTTPException(404, "Blog not found")
+        raise HTTPException(status_code=404, detail="Blog not found")
 
     if blog.author_id != current_user.id:
-        raise HTTPException(403, "Not your blog")
+        raise HTTPException(status_code=403, detail="Not your blog")
 
     if blog.status != BlogStatus.pending:
-        raise HTTPException(400, "Cannot edit approved/rejected blog")
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot edit a blog that is already approved or rejected.",
+        )
+
+    return blog_crud.update_blog(db, blog, blog_update)
+# -------------------------
+# Author: update blog if still pending
+# -------------------------
+@router.put("/{blog_id}", response_model=BlogOut)
+def update_blog(
+    blog_id: int,
+    blog_update: BlogUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    blog = blog_crud.get_blog(db, blog_id)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog not found")
+
+    if blog.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your blog")
+
+    if blog.status != BlogStatus.pending:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot edit a blog that is already approved or rejected.",
+        )
+
+    return blog_crud.update_blog(db, blog, blog_update)
+# -------------------------
+# Author: update blog if still pending
+# -------------------------
+@router.put("/{blog_id}", response_model=BlogOut)
+def update_blog(
+    blog_id: int,
+    blog_update: BlogUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    blog = blog_crud.get_blog(db, blog_id)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog not found")
+
+    if blog.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your blog")
+
+    if blog.status != BlogStatus.pending:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot edit a blog that is already approved or rejected.",
+        )
+
+    return blog_crud.update_blog(db, blog, blog_update)
+# -------------------------
+# Author: update blog if still pending
+# -------------------------
+@router.put("/{blog_id}", response_model=BlogOut)
+def update_blog(
+    blog_id: int,
+    blog_update: BlogUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    blog = blog_crud.get_blog(db, blog_id)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog not found")
+
+    if blog.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your blog")
+
+    if blog.status != BlogStatus.pending:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot edit a blog that is already approved or rejected.",
+        )
 
     return blog_crud.update_blog(db, blog, blog_update)
 
-
 # -------------------------
-# Delete blog (author)
+# Author: delete blog
 # -------------------------
 @router.delete("/{blog_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_blog(
     blog_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     blog = blog_crud.get_blog(db, blog_id)
     if not blog:
-        raise HTTPException(404, "Blog not found")
+        raise HTTPException(status_code=404, detail="Blog not found")
 
     if blog.author_id != current_user.id:
-        raise HTTPException(403, "Not your blog")
+        raise HTTPException(status_code=403, detail="Not your blog")
 
     blog_crud.delete_blog(db, blog)
     return None
 
 
+
 # -------------------------
-# Admin Approve
+# Admin / Approver: approve
 # -------------------------
 @router.post("/{blog_id}/approve", response_model=BlogOut)
 def approve_blog(
     blog_id: int,
     db: Session = Depends(get_db),
-    current_admin=Depends(require_role(Role.admin, Role.approver)),
+    current_admin: User = Depends(require_role(Role.admin, Role.approver)),
 ):
     blog = blog_crud.get_blog(db, blog_id)
     if not blog:
-        raise HTTPException(404, "Blog not found")
+        raise HTTPException(status_code=404, detail="Blog not found")
 
     return blog_crud.approve_blog(db, blog)
 
 
 # -------------------------
-# Admin Reject
+# Admin / Approver: reject
 # -------------------------
 @router.post("/{blog_id}/reject", response_model=BlogOut)
 def reject_blog(
     blog_id: int,
     db: Session = Depends(get_db),
-    current_admin=Depends(require_role(Role.admin, Role.approver)),
+    current_admin: User = Depends(require_role(Role.admin, Role.approver)),
 ):
     blog = blog_crud.get_blog(db, blog_id)
     if not blog:
-        raise HTTPException(404, "Blog not found")
+        raise HTTPException(status_code=404, detail="Blog not found")
 
     return blog_crud.reject_blog(db, blog)
+
+
+"""
+
+10 Input JSON for blog post
+{
+  "title": "My First Blog Post",
+  "content": "This is the content of my first blog post."
+}
+{"title": "My Updated Blog Post",
+ "content": "This is the updated content of my blog post."
+}
+{"title":"First day of School, Exciting Times Ahead!",
+ "content":"Today marks the beginning of a new academic year. I'm thrilled to start this journey and eager to learn new things. Looking forward to making new friends and exploring new subjects!"  }
+ {"title": "A Day in the Life of a Developer",
+  "content": "Being a developer is both challenging and rewarding. From writing code to debugging issues, every day brings new opportunities to learn and grow in this ever-evolving field."}
+{"title": "Exploring the Great Outdoors",
+ "content": "Spending time in nature is rejuvenating. Whether it's hiking through forests, camping under the stars, or simply taking a walk in the park, the great outdoors offers endless opportunities for adventure and relaxation."}
+{"title": "The Art of Cooking",
+ "content": "Cooking is a delightful blend of creativity and science. Experimenting with different ingredients and flavors allows me to create delicious meals that bring joy to myself and others."}
+{"title": "Travel Diaries: My Journey to Japan",
+ "content": "Japan is a country rich in culture and history. From the bustling streets of Tokyo to the serene temples of Kyoto, every moment of my trip was filled with unforgettable experiences and breathtaking sights."}
+
+ {"title": "The Importance of Mental Health",
+ "content": "Taking care of our mental health is crucial for overall well-being. Practices like mindfulness, therapy, and self-care can help us navigate life's challenges and maintain a positive outlook."}
+
+ {"title": "Tech Innovations Shaping the Future",
+ "content": "The rapid pace of technological advancements is transforming the way we live and work. From artificial intelligence to renewable energy, these innovations hold the promise of a brighter and more sustainable future."}
+
+ {"title": "Fitness Journey: Embracing a Healthier Lifestyle",
+ "content": "Embarking on a fitness journey has been a transformative experience. Incorporating regular exercise and balanced nutrition into my routine has not only improved my physical health but also boosted my mental clarity and energy levels."}
+
+ {  
+ "title": "My Second Blog Post",
+ "content": "This is the content of my second blog post."}
+ 
+ # few posts for getting rejected 
+ {"title": "Spam Blog Post",
+  "content": "Buy cheap products now!!! Visit spammywebsite.com for amazing deals!!!"}
+
+{"title": "Clickbait Title",
+ "content": "You won't believe what happened next! Click here to find out more!!!"} 
+
+ {"title": "Fake News Article",
+  "content": "Breaking news: Aliens have landed on Earth and are taking over the world!!!"}
+
+  {"title": "Inappropriate Content",
+   "content": "This blog contains offensive language and inappropriate material!!!"}
+  
+"""

@@ -21,11 +21,16 @@ def get_blog(db: Session, blog_id: int):
     return db.query(Blog).filter(Blog.id == blog_id).first()
 
 
-def list_approved(db: Session):
-    return db.query(Blog).filter(Blog.status == BlogStatus.approved).all()
+def list_approved(db: Session) -> list[Blog]:
+    return (
+        db.query(Blog)
+        .filter(Blog.status == BlogStatus.approved)
+        .order_by(Blog.created_at.desc())
+        .all()
+    )
 
 
-def update_blog(db: Session, blog: Blog, updates: BlogUpdate):
+def update_blog(db: Session, blog: Blog, updates: BlogUpdate) -> Blog:
     if updates.title is not None:
         blog.title = updates.title
     if updates.content is not None:
@@ -36,21 +41,36 @@ def update_blog(db: Session, blog: Blog, updates: BlogUpdate):
     return blog
 
 
-def delete_blog(db: Session, blog: Blog):
+def delete_blog(db: Session, blog: Blog) -> None:
     db.delete(blog)
     db.commit()
-    return True
 
 
-def approve_blog(db: Session, blog: Blog):
+def approve_blog(db: Session, blog: Blog) -> Blog:
     blog.status = BlogStatus.approved
     db.commit()
     db.refresh(blog)
     return blog
 
 
-def reject_blog(db: Session, blog: Blog):
+def reject_blog(db: Session, blog: Blog) -> Blog:
     blog.status = BlogStatus.rejected
     db.commit()
     db.refresh(blog)
     return blog
+
+def list_pending(db: Session) -> list[Blog]:
+    return (
+        db.query(Blog)
+        .filter(Blog.status == BlogStatus.pending)
+        .order_by(Blog.created_at.desc())
+        .all()
+    )
+
+def list_rejected(db: Session) -> list[Blog]:
+    return (
+        db.query(Blog)
+        .filter(Blog.status == BlogStatus.rejected)
+        .order_by(Blog.created_at.desc())
+        .all()
+    )

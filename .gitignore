@@ -12,3 +12,4 @@ instance/
 dev.db # SQLite database file
 .DS_Store
 .vscode/
+dev.db
