@@ -7,6 +7,7 @@ from app.model.blog import BlogStatus
 from app.model.user import Role, User
 from app.schemas.blog import BlogCreate, BlogUpdate, BlogOut
 from app.crud import blog_crud as blog_crud
+from app.services.notifications import notifier
 
 router = APIRouter()
 
@@ -37,21 +38,50 @@ def list_public_blogs(db: Session = Depends(get_db)):
 
 
 
+# # -------------------------
+# # Authenticated: create blog (status = pending)
+# # -------------------------
+# @router.post(
+#     "/",
+#     response_model=BlogOut,
+#     status_code=status.HTTP_201_CREATED,
+# )
+# def create_blog(
+#     blog_in: BlogCreate,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user),
+# ):
+#     return blog_crud.create_blog(db, current_user.id, blog_in)
+
+
 # -------------------------
-# Authenticated: create blog (status = pending)
+# Authenticated: create blog (status = pending) with SSE notification
 # -------------------------
 @router.post(
     "/",
     response_model=BlogOut,
     status_code=status.HTTP_201_CREATED,
 )
-def create_blog(
+async def create_blog(
     blog_in: BlogCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return blog_crud.create_blog(db, current_user.id, blog_in)
+    blog = blog_crud.create_blog(db, current_user.id, blog_in)
 
+    # Publish SSE event for new pending blog
+    if blog.status == BlogStatus.pending:
+        await notifier.publish(
+            {
+                "type": "blog_pending",
+                "blog_id": blog.id,
+                "title": blog.title,
+                "author_id": blog.author_id,
+                "created_at": blog.created_at.isoformat(),
+            }
+        )
+
+    return blog
 
 
 # -------------------------
@@ -67,78 +97,6 @@ def get_blog(blog_id: int, db: Session = Depends(get_db)):
     return blog
 
 
-# -------------------------
-# Author: update blog if still pending
-# -------------------------
-@router.put("/{blog_id}", response_model=BlogOut)
-def update_blog(
-    blog_id: int,
-    blog_update: BlogUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    blog = blog_crud.get_blog(db, blog_id)
-    if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
-
-    if blog.author_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not your blog")
-
-    if blog.status != BlogStatus.pending:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot edit a blog that is already approved or rejected.",
-        )
-
-    return blog_crud.update_blog(db, blog, blog_update)
-# -------------------------
-# Author: update blog if still pending
-# -------------------------
-@router.put("/{blog_id}", response_model=BlogOut)
-def update_blog(
-    blog_id: int,
-    blog_update: BlogUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    blog = blog_crud.get_blog(db, blog_id)
-    if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
-
-    if blog.author_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not your blog")
-
-    if blog.status != BlogStatus.pending:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot edit a blog that is already approved or rejected.",
-        )
-
-    return blog_crud.update_blog(db, blog, blog_update)
-# -------------------------
-# Author: update blog if still pending
-# -------------------------
-@router.put("/{blog_id}", response_model=BlogOut)
-def update_blog(
-    blog_id: int,
-    blog_update: BlogUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    blog = blog_crud.get_blog(db, blog_id)
-    if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
-
-    if blog.author_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not your blog")
-
-    if blog.status != BlogStatus.pending:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot edit a blog that is already approved or rejected.",
-        )
-
-    return blog_crud.update_blog(db, blog, blog_update)
 # -------------------------
 # Author: update blog if still pending
 # -------------------------
