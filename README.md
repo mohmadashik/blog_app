@@ -1,4 +1,4 @@
-# Blog Platform Backend (FastAPI + PostgreSQL/SQLite)
+# Blog Platform Backend (FastAPI + SQLite)
 
 A modern, real-time backend for a blog platform built with **FastAPI**, **JWT Authentication**, **Role-Based Access Control (RBAC)**, **SSE Notifications**, **WebSocket Chat**, and **SQLAlchemy ORM**.  
 Designed as an interview-ready case study demonstrating backend architecture, real-time features, modular design, and production readiness.
