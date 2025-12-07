@@ -279,5 +279,115 @@ For real deployments:
 
 - CORS restricted to your frontend domain
 
+
+```markdown
+```mermaid
+flowchart LR
+    subgraph ClientSide[Clients]
+        FE[Browser / React Frontend]
+        AdminFE[Admin Panel / Admin Browser]
+    end
+
+    subgraph FastAPIApp[FastAPI App (app.main)]
+        direction LR
+
+        subgraph API[API Layer (app.api.*)]
+            AuthAPI[auth.py\n/register, /login, /me]
+            BlogsAPI[blogs.py\nCRUD + /pending + /approve + /reject + /ws]
+            FRAPI[feature_requests.py\nFeature Requests CRUD]
+            SessionAPI[session.py\nDraft Get/Save]
+            NotifAPI[notifications.py\nSSE /notifications/sse]
+        end
+
+        subgraph Core[Core & Infra]
+            Config[core.config\nSettings / .env]
+            Security[core.security\nJWT + Hashing]
+            Deps[deps.py\nget_current_user,\nrequire_role]
+            DBSession[db.session\nEngine + SessionLocal]
+        end
+
+        subgraph Domain[Domain Layer]
+            subgraph Models[SQLAlchemy Models (app.model)]
+                UserModel[user.py\nUser, Role]
+                BlogModel[blog.py\nBlog, BlogStatus]
+                FRModel[feature_request.py\nFeatureRequest,\nFeatureRequestStatus]
+                DraftModel[draft.py\nDraft]
+            end
+
+            subgraph Schemas[Pydantic Schemas (app.schemas)]
+                UserSchemas[user.py\nUserCreate, UserOut, Token]
+                BlogSchemas[blog.py\nBlogCreate,\nBlogUpdate,\nBlogOut]
+                FRSchemas[feature_request.py\nFeatureRequestCreate,\nFeatureRequestOut]
+                DraftSchemas[draft.py\nDraftSave,\nDraftOut]
+            end
+
+            subgraph CRUDLayer[CRUD (app.crud)]
+                BlogCRUD[blog.py]
+                FRCRUD[feature_request.py]
+                DraftCRUD[draft.py]
+            end
+        end
+
+        subgraph Realtime[Real-time Services (app.services)]
+            Notifier[notifications.py\nNotificationManager\n(SSE pub/sub)]
+            ChatMgr[chat.py\nBlogChatManager\n(WebSocket rooms)]
+        end
+    end
+
+    subgraph DB[(Database)]
+        SQLDB[(PostgreSQL / SQLite)]
+    end
+
+    %% Client → API
+    FE -->|REST\nHTTPS| AuthAPI
+    FE -->|REST\nHTTPS| BlogsAPI
+    FE -->|REST\nHTTPS| FRAPI
+    FE -->|REST\nHTTPS| SessionAPI
+
+    AdminFE -->|SSE\ntext/event-stream| NotifAPI
+    FE -->|WebSocket\nws://.../blogs/{id}/ws| BlogsAPI
+
+    %% API → Core
+    AuthAPI --> Security
+    BlogsAPI --> Security
+    FRAPI --> Security
+    SessionAPI --> Security
+    NotifAPI --> Deps
+
+    AuthAPI --> Deps
+    BlogsAPI --> Deps
+    FRAPI --> Deps
+    SessionAPI --> Deps
+
+    %% API → CRUD/Realtime
+    BlogsAPI --> BlogCRUD
+    FRAPI --> FRCRUD
+    SessionAPI --> DraftCRUD
+
+    BlogsAPI --> ChatMgr
+    BlogsAPI --> Notifier
+    NotifAPI --> Notifier
+
+    %% CRUD → DB
+    BlogCRUD --> SQLDB
+    FRCRUD --> SQLDB
+    DraftCRUD --> SQLDB
+
+    %% Models / Schemas wiring (conceptual)
+    BlogCRUD --> BlogModel
+    FRCRUD --> FRModel
+    DraftCRUD --> DraftModel
+
+    AuthAPI --> UserModel
+    AuthAPI --> UserSchemas
+
+    BlogsAPI --> BlogSchemas
+    FRAPI --> FRSchemas
+    SessionAPI --> DraftSchemas
+
+    Core --> DBSession
+    DBSession --> SQLDB
+```
+
 📝 License
 MIT — For interview/demo purposes.
