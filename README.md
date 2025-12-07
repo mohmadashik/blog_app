@@ -25,6 +25,7 @@ Designed as an interview-ready case study demonstrating backend architecture, re
   - Reject posts  
 - Public can view **approved** blogs only  
 - Endpoint summary:
+```
 GET /api/blogs/
 POST /api/blogs/
 GET /api/blogs/{id}
@@ -33,9 +34,8 @@ DELETE /api/blogs/{id}
 POST /api/blogs/{id}/approve
 POST /api/blogs/{id}/reject
 GET /api/blogs/pending (admin/approver only)
+```
 
-yaml
-Copy code
 
 ---
 
@@ -44,10 +44,8 @@ Copy code
 Admins receive live notifications when a new blog is submitted for approval.
 
 Endpoint:
-GET /api/notifications/sse
+```GET /api/notifications/sse```
 
-markdown
-Copy code
 
 Internally uses:
 - Async generator
@@ -58,10 +56,8 @@ Internally uses:
 Real-time chat per blog.
 
 Endpoint:
-WS /api/blogs/{id}/ws?token=<JWT>
+```WS /api/blogs/{id}/ws?token=<JWT>```
 
-yaml
-Copy code
 
 Features:
 - JWT-based authentication (via query param)
@@ -79,12 +75,11 @@ Admins/Approvers can change their status:
 - `declined`
 
 Endpoints:
+```
 GET /api/feature-requests/
 POST /api/feature-requests/
 PATCH /api/feature-requests/{id}
-
-yaml
-Copy code
+```
 
 ---
 
@@ -92,11 +87,10 @@ Copy code
 Users can save blog drafts and continue later.
 
 Endpoints:
+```
 GET /api/session/draft
 POST /api/session/draft
-
-yaml
-Copy code
+```
 
 Implementation:
 - Simple `Draft` model per user  
@@ -106,7 +100,7 @@ Implementation:
 ---
 
 ## 🧱 Project Structure
-
+```
 app/
 │
 ├── api/ # Request handlers (routes)
@@ -153,42 +147,37 @@ app/
 │ └── init.py
 │
 └── main.py # App initialization
+```
 
-yaml
-Copy code
 
 ---
 
 ## ⚙️ Setup & Running Locally
 
 ### **1. Install dependencies**
+```
 pip install -r requirements.txt
-
-markdown
-Copy code
+```
 
 ### **2. Run the application**
+```
 uvicorn app.main:app --reload
-
-bash
-Copy code
+```
 
 ### **3. Access API docs**
-- Swagger UI: http://localhost:8000/docs  
-- ReDoc: http://localhost:8000/redoc  
+- Swagger UI: http://localhost:8020/docs  
+- ReDoc: http://localhost:8020/redoc  
 
 ### **4. Environment Configuration**
 Configuration is handled in `core/config.py`.
 
 Typical `.env`:
-
+```
 SECRET_KEY="supersecret"
 ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 DATABASE_URL="sqlite:///./dev.db"
-
-yaml
-Copy code
+```
 
 ---
 
@@ -199,14 +188,10 @@ Copy code
 3. Use returned `access_token`:
 Authorization: Bearer <token>
 
-pgsql
-Copy code
 
 Role promotion (admin-only ops):
 POST /api/auth/make-admin/{username}
 
-yaml
-Copy code
 
 ---
 
@@ -214,94 +199,85 @@ Copy code
 
 1. User submits blog → `pending`
 2. Admin/Approver sees it in:
-GET /api/blogs/pending
+```GET /api/blogs/pending```
 
-markdown
-Copy code
 3. Approve:
-POST /api/blogs/{id}/approve
+```POST /api/blogs/{id}/approve```
 
-markdown
-Copy code
 4. Then it appears publicly in:
-GET /api/blogs/
+```GET /api/blogs/```
 
-yaml
-Copy code
 
 ---
 
 ## 🔔 SSE Real-Time Notifications (Admin)
 
-GET /api/notifications/sse
+```GET /api/notifications/sse```
 
-bash
-Copy code
 
 Client example (curl):
 
 ```bash
 curl -N -H "Accept: text/event-stream" \
      -H "Authorization: Bearer <ADMIN_TOKEN>" \
-     http://localhost:8000/api/notifications/sse
+     http://localhost:8020/api/notifications/sse
+```
 Event format:
-
-css
-Copy code
+```
 data: {"type":"blog_pending","blog_id":5,"title":"New Blog","author_id":2}
+```
 💬 WebSocket Chat Per Blog
-bash
-Copy code
-ws://localhost:8000/api/blogs/{id}/ws?token=<JWT>
+```
+ws://localhost:8020/api/blogs/{id}/ws?token=<JWT>
+```
 Example (wscat):
-
-bash
-Copy code
-wscat -c "ws://localhost:8000/api/blogs/1/ws?token=XYZ"
+```
+wscat -c "ws://localhost:8020/api/blogs/1/ws?token=XYZ"
+```
 Messages are broadcast to everyone connected to that blog.
 
 🧪 Testing
 Run tests:
 
-nginx
-Copy code
+```
 python -m pytest
+```
 Tests include:
 
-Auth tests (register + login)
+- Auth tests (register + login)
 
-Blog creation & approval workflow
+- Blog creation & approval workflow
 
-Pending visibility checks
+- Pending visibility checks
 
-The test suite uses:
+- The test suite uses:
 
-Separate SQLite test DB
+- Separate SQLite test DB
 
-FastAPI TestClient
+- FastAPI TestClient
 
-Dependency overrides for DB
+- Dependency overrides for DB
 
 📦 Production Readiness Notes
 For real deployments:
 
-Run under Gunicorn + Uvicorn workers
+- Run under Gunicorn + Uvicorn workers
 
-Reverse proxy with Nginx or Caddy
+- Reverse proxy with Nginx or Caddy
 
-HTTPS via Let's Encrypt
+- HTTPS via Let's Encrypt
 
-Set environment variables for secrets (never hardcode)
+- Set environment variables for secrets (never hardcode)
 
-Use PostgreSQL instead of SQLite
+- Use PostgreSQL instead of SQLite
 
-For multi-instance deployments:
+- For multi-instance deployments:
 
-Use Redis for WebSocket pub/sub
+- Use Redis for WebSocket pub/sub
 
-Use Redis or DB-backed SSE broadcaster
+- Use Redis or DB-backed SSE broadcaster
 
-CORS restricted to your frontend domain
+- CORS restricted to your frontend domain
 
 📝 License
 MIT — For interview/demo purposes.
