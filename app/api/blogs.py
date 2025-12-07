@@ -1,13 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import get_current_user, require_role
+from app.deps import get_current_user, require_role, get_user_by_username
 from app.model.blog import BlogStatus
 from app.model.user import Role, User
+from app.model.blog import BlogStatus
 from app.schemas.blog import BlogCreate, BlogUpdate, BlogOut
 from app.crud import blog_crud as blog_crud
 from app.services.notifications import notifier
+from app.services.chat import blog_chat_manager
+from app.core.security import decode_token
+
 
 router = APIRouter()
 
@@ -173,6 +177,70 @@ def reject_blog(
         raise HTTPException(status_code=404, detail="Blog not found")
 
     return blog_crud.reject_blog(db, blog)
+
+# -------------------------
+# WebSocket: blog chat
+# -------------------------
+
+@router.websocket("/{blog_id}/ws")
+async def blog_chat_ws(
+    websocket: WebSocket,
+    blog_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    WebSocket chat for a specific blog.
+
+    Auth:
+    - expects ?token=<JWT> query parameter
+    - token must be a valid user JWT
+    """
+
+    # ---- Auth via token query param ----
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008)  # Policy Violation
+        return
+
+    try:
+        payload = decode_token(token)
+        username = payload.get("sub")
+        if not username:
+            await websocket.close(code=1008)
+            return
+        user = get_user_by_username(db, username=username)
+        if not user or not user.is_active:
+            await websocket.close(code=1008)
+            return
+    except Exception:
+        await websocket.close(code=1008)
+        return
+
+    # ---- Ensure blog exists ----
+    blog = blog_crud.get_blog(db, blog_id)
+    if not blog:
+        await websocket.close(code=1008)
+        return
+
+    # ---- Connect ----
+    await blog_chat_manager.connect(blog_id, websocket)
+
+    try:
+        while True:
+            text = await websocket.receive_text()
+            # You can format messages however you like
+            message = f"{user.username}: {text}"
+            await blog_chat_manager.broadcast(blog_id, message)
+    except WebSocketDisconnect:
+        blog_chat_manager.disconnect(blog_id, websocket)
+    except Exception:
+        blog_chat_manager.disconnect(blog_id, websocket)
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+
+
 
 
 """
