@@ -1,105 +1,67 @@
 flowchart LR
-    subgraph ClientSide[Clients]
-        FE[Browser / React Frontend]
-        AdminFE[Admin Panel / Admin Browser]
-    end
+    Client["Browser / React Frontend"]
+    Admin["Admin Browser"]
 
-    subgraph FastAPIApp[FastAPI App (app.main)]
+    subgraph Backend["FastAPI Backend"]
         direction LR
 
-        subgraph API[API Layer (app.api.*)]
-            AuthAPI[auth.py\n/register, /login, /me]
-            BlogsAPI[blogs.py\nCRUD + /pending + /approve + /reject + /ws]
-            FRAPI[feature_requests.py\nFeature Requests CRUD]
-            SessionAPI[session.py\nDraft Get/Save]
-            NotifAPI[notifications.py\nSSE /notifications/sse]
+        subgraph API["API Layer"]
+            AuthAPI["auth.py /auth/*"]
+            BlogsAPI["blogs.py /blogs/*"]
+            FRAPI["feature_requests.py /feature-requests/*"]
+            SessionAPI["session.py /session/draft"]
+            NotifAPI["notifications.py /notifications/sse"]
         end
 
-        subgraph Core[Core & Infra]
-            Config[core.config\nSettings / .env]
-            Security[core.security\nJWT + Hashing]
-            Deps[deps.py\nget_current_user,\nrequire_role]
-            DBSession[db.session\nEngine + SessionLocal]
+        subgraph Core["Core and Infra"]
+            Config["core.config"]
+            Security["core.security"]
+            Deps["deps.py"]
+            DBSession["db.session"]
         end
 
-        subgraph Domain[Domain Layer]
-            subgraph Models[SQLAlchemy Models (app.model)]
-                UserModel[user.py\nUser, Role]
-                BlogModel[blog.py\nBlog, BlogStatus]
-                FRModel[feature_request.py\nFeatureRequest,\nFeatureRequestStatus]
-                DraftModel[draft.py\nDraft]
-            end
-
-            subgraph Schemas[Pydantic Schemas (app.schemas)]
-                UserSchemas[user.py\nUserCreate, UserOut, Token]
-                BlogSchemas[blog.py\nBlogCreate,\nBlogUpdate,\nBlogOut]
-                FRSchemas[feature_request.py\nFeatureRequestCreate,\nFeatureRequestOut]
-                DraftSchemas[draft.py\nDraftSave,\nDraftOut]
-            end
-
-            subgraph CRUDLayer[CRUD (app.crud)]
-                BlogCRUD[blog.py]
-                FRCRUD[feature_request.py]
-                DraftCRUD[draft.py]
-            end
+        subgraph Domain["Domain and CRUD"]
+            Models["Models: User, Blog, FeatureRequest, Draft"]
+            Schemas["Schemas: User, Blog, FeatureRequest, Draft"]
+            CRUD["CRUD: blog, feature_request, draft"]
         end
 
-        subgraph Realtime[Real-time Services (app.services)]
-            Notifier[notifications.py\nNotificationManager\n(SSE pub/sub)]
-            ChatMgr[chat.py\nBlogChatManager\n(WebSocket rooms)]
+        subgraph Realtime["Realtime Services"]
+            Notifier["NotificationManager for SSE"]
+            ChatMgr["BlogChatManager for WebSockets"]
         end
     end
 
-    subgraph DB[(Database)]
-        SQLDB[(PostgreSQL / SQLite)]
-    end
+    DB["PostgreSQL or SQLite"]
 
     %% Client → API
-    FE -->|REST\nHTTPS| AuthAPI
-    FE -->|REST\nHTTPS| BlogsAPI
-    FE -->|REST\nHTTPS| FRAPI
-    FE -->|REST\nHTTPS| SessionAPI
+    Client -->|"REST JSON"| AuthAPI
+    Client -->|"REST JSON"| BlogsAPI
+    Client -->|"REST JSON"| FRAPI
+    Client -->|"REST JSON"| SessionAPI
 
-    AdminFE -->|SSE\ntext/event-stream| NotifAPI
-    FE -->|WebSocket\nws://.../blogs/{id}/ws| BlogsAPI
+    Admin -->|"SSE stream"| NotifAPI
+    Client -->|"WebSocket /blogs/{id}/ws"| BlogsAPI
 
     %% API → Core
     AuthAPI --> Security
     BlogsAPI --> Security
     FRAPI --> Security
     SessionAPI --> Security
-    NotifAPI --> Deps
 
     AuthAPI --> Deps
     BlogsAPI --> Deps
     FRAPI --> Deps
     SessionAPI --> Deps
 
-    %% API → CRUD/Realtime
-    BlogsAPI --> BlogCRUD
-    FRAPI --> FRCRUD
-    SessionAPI --> DraftCRUD
+    %% API → Domain / Realtime
+    BlogsAPI --> CRUD
+    FRAPI --> CRUD
+    SessionAPI --> CRUD
 
     BlogsAPI --> ChatMgr
-    BlogsAPI --> Notifier
     NotifAPI --> Notifier
 
     %% CRUD → DB
-    BlogCRUD --> SQLDB
-    FRCRUD --> SQLDB
-    DraftCRUD --> SQLDB
-
-    %% Models / Schemas wiring (conceptual)
-    BlogCRUD --> BlogModel
-    FRCRUD --> FRModel
-    DraftCRUD --> DraftModel
-
-    AuthAPI --> UserModel
-    AuthAPI --> UserSchemas
-
-    BlogsAPI --> BlogSchemas
-    FRAPI --> FRSchemas
-    SessionAPI --> DraftSchemas
-
-    Core --> DBSession
-    DBSession --> SQLDB
+    CRUD --> DB
+    DBSession --> DB
