@@ -13,3 +13,4 @@ dev.db # SQLite database file
 .DS_Store
 .vscode/
 dev.db
+test_inputs.py
