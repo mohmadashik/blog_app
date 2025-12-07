@@ -163,12 +163,16 @@ pip install -r requirements.txt
 ```
 uvicorn app.main:app --reload
 ```
+### **3. We can also install & run it is using a single command**
 
-### **3. Access API docs**
+```
+./install_and_run.sh
+```
+
+### **4. Access API docs**
 - Swagger UI: http://localhost:8020/docs  
-- ReDoc: http://localhost:8020/redoc  
 
-### **4. Environment Configuration**
+### **5. Environment Configuration**
 Configuration is handled in `core/config.py`.
 
 Typical `.env`:
